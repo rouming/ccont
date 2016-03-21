@@ -1,0 +1,99 @@
+ccont: Tool burns CPUs on different NUMA nodes and measures execution time.
+
+Description:
+    The goal is to measure cache contention on different NUMA nodes,
+    burn different CPUs, execute different instructions with different
+    load patterns, e.g. the following is the list of three load patterns
+    which were executed on machine with 2 NUMA nodes and 8 CPUs:
+
+    o cpu-increase - on each iteration number of CPU is increased:
+
+      # ./ccont --load cpu-increase --op cmpxchg
+      Nodes  N0   N1  CPUs    operation       min       max       avg     stdev
+       CPUs *--- ----    1      cmpxchg     8.938     8.938     8.938     0.000
+       CPUs **-- ----    2      cmpxchg    36.114    36.119    36.117     0.004
+       CPUs ***- ----    3      cmpxchg    54.270    54.272    54.271     0.001
+       CPUs **** ----    4      cmpxchg    72.292    72.321    72.313     0.013
+       CPUs **** *---    5      cmpxchg    61.691   108.060    98.782    20.735
+       CPUs **** **--    6      cmpxchg   101.316   136.923   125.059    18.369
+       CPUs **** ***-    7      cmpxchg   151.639   169.218   161.702     9.358
+       CPUs **** ****    8      cmpxchg   192.281   196.250   194.281     2.098
+
+    o node-cascade - on each iteration CPUs from each node are burned:
+
+      # ./ccont --load node-cascade --op cmpxchg
+      Nodes  N0   N1  CPUs    operation       min       max       avg     stdev
+       CPUs **** ----    4      cmpxchg    72.287    72.322    72.310     0.016
+       CPUs ---- ****    4      cmpxchg    72.327    72.333    72.330     0.003
+
+    o cpu-rollover - on each iteration executor thread rolls to another CPU on
+    the next node, keeping the same amount of CPUs burning:
+
+      # ./ccont --load cpu-rollover --op cmpxcgh
+      Nodes  N0   N1  CPUs    operation       min       max       avg     stdev
+       CPUs **** ----    4      cmpxchg    48.769    48.774    48.772     0.002
+       CPUs ***- *---    4      cmpxchg    85.506    97.754    94.683     6.118
+       CPUs **-- **--    4      cmpxchg   116.803   121.450   119.108     2.658
+       CPUs *--- ***-    4      cmpxchg    91.312   103.877   100.721     6.273
+       CPUs ---- ****    4      cmpxchg    48.288    48.368    48.323     0.038
+
+    Memory chunk for each load is always allocated on the node#0.
+
+    Results show, that scattered tasks over NUMA nodes show bad performance for
+    cmpxchg instruction (cpu-rollover pattern), but execution on remote node
+    is not so bad, because of the L3 cache (node-cascade pattern).  Increase of
+    the CPUs number can degrade performance by factor of 24 because of the cache
+    line contention (cpu-increase pattern).
+
+    The following burning operations are supported:
+
+    o "idle" - idle loop:
+          used just for calibrating.
+              while (spins--)
+                   ;
+
+    o "memset64" - memset glibc call:
+	      memsets 64 bytes (usual cache line size).
+
+    o "memset128" - memset glibc call:
+	      memsets 128 bytes.
+
+    o "memset256" - memset glibc call:
+	      memsets 256 bytes.
+
+    o "test_bit" - btl:
+          testing a bit, used for test_bit() in Linux kernel.
+              var | (1 << bit)
+
+    o "set_bit" - bts:
+          test and set bit, used for test_and_set_bit() in Linux kernel.
+          "test_bit" - name in test results.
+              res = var | (1 << bit)
+              var |= (1 << bit)
+
+    o "inc" - lock inc:
+          increment, used for atomic_inc() in Linux kernel.
+              var += 1
+
+    o "xadd" - lock xadd:
+          exchanges operands, used for __sync_fetch_and_add()
+          and similar gcc atomic builtins.
+              tmp = src + dst;
+              src = dst;
+              dst = tmp;
+
+    o "cmpxchg" - lock cmpxchg:
+          exchanges operangs, used for cmpxchg() for all sorts of atomic
+          exchanges in Linux kernel.
+              res = var
+              if (res == old)
+                  var = new
+
+    o "mfence" - mfence:
+          memory barrier for load and store, used for smp_mb() in Linux kernel.
+
+    o "sfence" - sfence:
+          memory barrier for store, used for smp_wmb() in Linux kernel.
+
+    o "lfence" - lfence:
+          memory barrier for load, used for smp_rmb() in Linux kernel.
