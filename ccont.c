@@ -276,57 +276,76 @@ static void burn_cpu__idle_loop(struct thr_param *arg)
 
 static void burn_cpu__memset64(struct thr_param *arg)
 {
-	BURN_CPU(memset(arg->p->data, 0, 64));
+	data_t *d;
+
+	d = arg->p->data;
+	BURN_CPU(memset(d, 0, 64));
 }
 
 static void burn_cpu__memset128(struct thr_param *arg)
 {
-	BURN_CPU(memset(arg->p->data, 0, 128));
+	data_t *d;
+
+	d = arg->p->data;
+	BURN_CPU(memset(d, 0, 128));
 }
 
 static void burn_cpu__memset256(struct thr_param *arg)
 {
-	BURN_CPU(memset(arg->p->data, 0, 256));
+	data_t *d;
+
+	d = arg->p->data;
+	BURN_CPU(memset(d, 0, 256));
 }
 
 static void burn_cpu__test_bit(struct thr_param *arg)
 {
 	int bit;
+	data_t *d;
 
 	bit = arg->cpu << arg->p->dist;
-	BURN_CPU(test_bit(bit, arg->p->data));
+	d = arg->p->data;
+	BURN_CPU(test_bit(bit, d));
 }
 
 static void burn_cpu__set_bit(struct thr_param *arg)
 {
 	int bit;
+	data_t *d;
 
 	bit = arg->cpu << arg->p->dist;
-	BURN_CPU(set_bit(bit, arg->p->data));
+	d = arg->p->data;
+	BURN_CPU(set_bit(bit, d));
 }
 
 static void burn_cpu__xadd(struct thr_param *arg)
 {
 	int ind;
+	data_t *d;
 
 	ind = arg->cpu * arg->p->dist;
-	BURN_CPU(atomic_inc((int *)&arg->p->data[ind]));
+	d = &arg->p->data[ind];
+	BURN_CPU(atomic_inc((int *)d));
 }
 
 static void burn_cpu__inc(struct thr_param *arg)
 {
 	int ind;
+	data_t *d;
 
 	ind = arg->cpu * arg->p->dist;
-	BURN_CPU(lin_atomic_inc((int *)&arg->p->data[ind]));
+	d = &arg->p->data[ind];
+	BURN_CPU(lin_atomic_inc((int *)d));
 }
 
 static void burn_cpu__cmpxchg(struct thr_param *arg)
 {
 	int ind;
+	data_t *d;
 
 	ind = arg->cpu * arg->p->dist;
-	BURN_CPU(cmpxchg(&arg->p->data[ind], arg->cpu, arg->cpu+1));
+	d = &arg->p->data[ind];
+	BURN_CPU(cmpxchg(d, 0, 1));
 }
 
 static void burn_cpu__mfence(struct thr_param *arg)
