@@ -62,6 +62,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include <sys/time.h>
+#include <sys/syscall.h>
 #include <time.h>
 #include <pthread.h>
 #include <string.h>
@@ -242,6 +243,10 @@ static inline void set_bit(int nr, void *addr)
 #define cmpxchg(ptr, old, new)					\
 	__cmpxchg(ptr, old, new, sizeof(*(ptr)))
 
+static inline unsigned long xchg(unsigned long *p, unsigned long val)
+{
+	return __atomic_exchange_n(p, val, __ATOMIC_SEQ_CST);
+}
 
 static inline unsigned long long rdtsc(void)
 {
@@ -348,9 +353,30 @@ static void burn_cpu__cmpxchg(struct thr_param *arg)
 	BURN_CPU(cmpxchg(d, 0, 1));
 }
 
+static void burn_cpu__xchg(struct thr_param *arg)
+{
+	int ind;
+	data_t *d;
+
+	ind = arg->cpu * arg->p->dist;
+	d = &arg->p->data[ind];
+	BURN_CPU(xchg(d, 0));
+}
+
 static void burn_cpu__mfence(struct thr_param *arg)
 {
 	BURN_CPU(asm volatile ("mfence" ::: "memory"));
+}
+
+static void burn_cpu__mov_mfence(struct thr_param *arg)
+{
+	int ind;
+	data_t *d;
+
+	ind = arg->cpu * arg->p->dist;
+	d = &arg->p->data[ind];
+	BURN_CPU(*d = 0;				\
+		 asm volatile ("mfence" ::: "memory"));
 }
 
 static void burn_cpu__lfence(struct thr_param *arg)
@@ -361,6 +387,12 @@ static void burn_cpu__lfence(struct thr_param *arg)
 static void burn_cpu__sfence(struct thr_param *arg)
 {
 	BURN_CPU(asm volatile ("sfence" ::: "memory"));
+}
+
+static void burn_cpu__syscall(struct thr_param *arg)
+{
+	/* Invalid syscall to be able return from the kernel immediately */
+	BURN_CPU(syscall(99999));
 }
 
 struct burn_ent {
@@ -386,12 +418,18 @@ struct burn_ent {
 	 burn_cpu__inc},
 	{"cmpxchg",   "Atomic compare and xchange.",
 	 burn_cpu__cmpxchg},
+	{"xchg",      "Atomic xchange.",
+	 burn_cpu__xchg},
 	{"mfence",    "'mfence' instruction.",
 	 burn_cpu__mfence},
+	{"mov+mfence", "'mov+mfence' instructions.",
+	 burn_cpu__mov_mfence},
 	{"lfence",    "'lfence' instruction.",
 	 burn_cpu__lfence},
 	{"sfence",    "'sfence' instruction.",
 	 burn_cpu__sfence},
+	{"syscall",    "To kernel and back.",
+	 burn_cpu__syscall},
 };
 
 static void self_setaffinity(unsigned cpu)
