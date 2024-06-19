@@ -7,7 +7,7 @@ CFLAGS = -O2 -Wall -lpthread -lnuma -lm -lrt
 
 all: ccont
 %: %.c
-	$(CC) $(DEFINES) $(CFLAGS) -o $@ $^
+	$(CC) $(DEFINES) -o $@ $^ $(CFLAGS)
 
 clean:
 	$(RM) ccont *~
